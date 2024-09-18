@@ -22,17 +22,14 @@ public abstract class PlayerListHudMixin {
             .comparingInt((PlayerListEntry entry) -> entry.getGameMode() == GameMode.SPECTATOR ? 1 : 0)
             .thenComparing((entry) -> {
                 String lowerCaseName = Objects.requireNonNull(entry.getDisplayName()).getString().toLowerCase();
-                if (lowerCaseName.contains("head") && lowerCaseName.contains("admin")) {
-                    return -6;
-                } else if (lowerCaseName.contains("admin")) {
-                    return -5;
-                } else if (lowerCaseName.contains("mod")) {
-                    return -4;
-                } else if (lowerCaseName.contains("dev")) {
-                    return -3;
-                } else if (lowerCaseName.contains("artist")) {
-                    return -2;
-                } else return -1;
+                if (lowerCaseName.contains("[owner]")) return -6;
+                else if (lowerCaseName.contains("[admin]]")) return -5;
+                else if (lowerCaseName.contains("[dev]]")) return -4;
+                else if (lowerCaseName.contains("[mod]")) return -3;
+                else if (lowerCaseName.contains("[artist]")) return -2;
+                else if (lowerCaseName.contains("[content]")) return -1;
+                else if (lowerCaseName.contains("[") && lowerCaseName.contains("]")) return 0;
+                else return 1;
             })
             .thenComparing((entry) -> (String) Nullables.mapOrElse(entry.getScoreboardTeam(), Team::getName, ""))
             .thenComparing((entry) -> entry.getProfile().getName(), String::compareToIgnoreCase);
