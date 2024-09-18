@@ -28,6 +28,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+import net.minecraft.text.TextColor;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import org.slf4j.Logger;
@@ -100,10 +101,13 @@ public class CustomName implements ModInitializer {
                                     .then(CommandManager.literal("prefix")
                                             .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
                                                     .then(CommandManager.argument("name", StringArgumentType.string())
-                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
-                                                                    .executes(updateOtherPlayerName(NameType.PREFIX, true))
+                                                            .then(CommandManager.argument("color", StringArgumentType.string())
+                                                                    .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                            .executes(updateOtherPlayerName(NameType.PREFIX, true, true))
+                                                                    )
+                                                                    .executes(updateOtherPlayerName(NameType.PREFIX, true, false))
                                                             )
-                                                            .executes(updateOtherPlayerName(NameType.PREFIX, false))
+                                                            .executes(updateOtherPlayerName(NameType.PREFIX, false, false))
                                                     )
                                                     .executes(clearOtherPlayerName(NameType.PREFIX))
                                             )
@@ -111,10 +115,13 @@ public class CustomName implements ModInitializer {
                                     .then(CommandManager.literal("suffix")
                                             .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
                                                     .then(CommandManager.argument("name", StringArgumentType.string())
-                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
-                                                                    .executes(updateOtherPlayerName(NameType.SUFFIX, true))
+                                                            .then(CommandManager.argument("color", StringArgumentType.string())
+                                                                    .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                            .executes(updateOtherPlayerName(NameType.SUFFIX, true, true))
+                                                                    )
+                                                                    .executes(updateOtherPlayerName(NameType.SUFFIX, true, false))
                                                             )
-                                                            .executes(updateOtherPlayerName(NameType.SUFFIX, false))
+                                                            .executes(updateOtherPlayerName(NameType.SUFFIX, false, false))
                                                     )
                                                     .executes(clearOtherPlayerName(NameType.SUFFIX))
                                             )
@@ -122,10 +129,13 @@ public class CustomName implements ModInitializer {
                                     .then(CommandManager.literal("nickname")
                                             .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
                                                     .then(CommandManager.argument("name", StringArgumentType.string())
-                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
-                                                                    .executes(updateOtherPlayerName(NameType.NICKNAME, true))
+                                                            .then(CommandManager.argument("color", StringArgumentType.string())
+                                                                    .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                            .executes(updateOtherPlayerName(NameType.NICKNAME, true, true))
+                                                                    )
+                                                                    .executes(updateOtherPlayerName(NameType.NICKNAME, true, false))
                                                             )
-                                                            .executes(updateOtherPlayerName(NameType.NICKNAME, false))
+                                                            .executes(updateOtherPlayerName(NameType.NICKNAME, false, false))
                                                     )
                                                     .executes(clearOtherPlayerName(NameType.NICKNAME))
                                             )
@@ -270,7 +280,7 @@ public class CustomName implements ModInitializer {
         };
     }
 
-    private Command<ServerCommandSource> updateOtherPlayerName(PlayerNameManager.NameType nameType, boolean withBold) {
+    private Command<ServerCommandSource> updateOtherPlayerName(PlayerNameManager.NameType nameType, boolean withColor, boolean withBold) {
         return context -> {
             Collection<GameProfile> profiles;
             try {
@@ -286,6 +296,13 @@ public class CustomName implements ModInitializer {
             Text name;
             try {
                 name = playerNameArgumentToText(StringArgumentType.getString(context, "name"));
+
+                if (withColor) {
+                    TextColor color = TextColor.parse(StringArgumentType.getString(context, "color"));
+                    if (color != null) {
+                        name = name.getWithStyle(Style.EMPTY.withColor(color)).get(0);
+                    }
+                }
 
                 if (withBold) {
                     boolean bold = BoolArgumentType.getBool(context, "bold");
