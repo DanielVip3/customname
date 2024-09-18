@@ -22,7 +22,7 @@ import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.World;
 
 public class PlayerNameManager extends PersistentState {
-
+    private final Map<UUID, Formatting> playerFormattings = new HashMap<>();
     private final Map<UUID, Text> playerPrefixes = new HashMap<>();
     private final Map<UUID, Text> playerSuffixes = new HashMap<>();
     private final Map<UUID, Text> playerNicknames = new HashMap<>();
@@ -52,6 +52,23 @@ public class PlayerNameManager extends PersistentState {
         CustomName.LOGGER.info("Creating player name mappings - LuckPerms {}!", luckPermsState);
     }
 
+    public void updateUuidNameFormatting(UUID uuid, Formatting formatting) {
+        if (formatting == null) {
+            playerFormattings.remove(uuid);
+        } else {
+            playerFormattings.put(uuid, formatting);
+        }
+    }
+
+    public void updateUuidName(UUID uuid, Text playerName, Text name, NameType type) {
+        switch (type) {
+            case PREFIX -> playerPrefixes.put(uuid, name);
+            case SUFFIX -> playerSuffixes.put(uuid, name);
+            case NICKNAME -> playerNicknames.put(uuid, name);
+        }
+        markDirty(uuid, playerName);
+    }
+
     public void updatePlayerName(ServerPlayerEntity player, Text name, NameType type) {
         switch (type) {
             case PREFIX -> playerPrefixes.put(player.getUuid(), name);
@@ -65,7 +82,12 @@ public class PlayerNameManager extends PersistentState {
         if (!fullPlayerNames.containsKey(player.getUuid())) {
             updateFullPlayerName(player);
         }
-        return fullPlayerNames.get(player.getUuid());
+
+        if (!playerFormattings.containsKey(player.getUuid())) {
+            return fullPlayerNames.get(player.getUuid());
+        } else {
+            return fullPlayerNames.get(player.getUuid()).copy().formatted(playerFormattings.get(player.getUuid()));
+        }
     }
 
     private void markDirty(ServerPlayerEntity player) {
@@ -73,28 +95,35 @@ public class PlayerNameManager extends PersistentState {
         markDirty();
     }
 
+    private void markDirty(UUID uuid, Text playerName) {
+        updateFullPlayerNameFromUuid(uuid, playerName);
+        markDirty();
+    }
+
     private void updateFullPlayerName(ServerPlayerEntity player) {
+        updateFullPlayerNameFromUuid(player.getUuid(), player.getName());
+    }
+
+    private void updateFullPlayerNameFromUuid(UUID uuid, Text playerName) {
         String permissionsPrefix = null;
         String permissionsSuffix = null;
 
         if (luckPerms != null) {
-            User luckPermsUser = luckPerms.getUserManager().getUser(player.getUuid());
+            User luckPermsUser = luckPerms.getUserManager().getUser(uuid);
             if (luckPermsUser != null) {
                 permissionsPrefix = luckPermsUser.getCachedData().getMetaData().getPrefix();
                 permissionsSuffix = luckPermsUser.getCachedData().getMetaData().getSuffix();
             }
         }
 
-        Text prefix = playerPrefixes.get(player.getUuid());
-        Text suffix = playerSuffixes.get(player.getUuid());
-        Text nickname = playerNicknames.get(player.getUuid());
+        Text prefix = playerPrefixes.get(uuid);
+        Text suffix = playerSuffixes.get(uuid);
+        Text nickname = playerNicknames.get(uuid);
 
         MutableText name = Text.literal("");
         if (permissionsPrefix != null) {
             name.append(CustomName
-                    .argumentToText(permissionsPrefix,
-                            CustomNameConfig.getInstance().formattingEnabled(),
-                            true, false));
+                    .argumentToText(permissionsPrefix, CustomNameConfig.getInstance().formattingEnabled(), true, false));
             name.append(" ");
         }
         if (prefix != null) {
@@ -104,7 +133,7 @@ public class PlayerNameManager extends PersistentState {
         if (nickname != null) {
             name.append(nickname);
         } else {
-            name.append(player.getName());
+            name.append(playerName);
         }
         if (suffix != null) {
             name.append(" ");
@@ -113,12 +142,10 @@ public class PlayerNameManager extends PersistentState {
         if (permissionsSuffix != null) {
             name.append(" ");
             name.append(CustomName
-                    .argumentToText(permissionsSuffix,
-                            CustomNameConfig.getInstance().formattingEnabled(),
-                            true, false));
+                    .argumentToText(permissionsSuffix, CustomNameConfig.getInstance().formattingEnabled(), true, false));
         }
 
-        fullPlayerNames.put(player.getUuid(), name);
+        fullPlayerNames.put(uuid, name);
     }
 
     @Override

@@ -1,15 +1,22 @@
 package xyz.eclipseisoffline.eclipsescustomname;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Collection;
 import java.util.function.Predicate;
 import me.lucko.fabric.api.permissions.v0.Permissions;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.command.argument.ColorArgumentType;
+import net.minecraft.command.argument.GameProfileArgumentType;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
@@ -73,6 +80,55 @@ public class CustomName implements ModInitializer {
                                                     .executes(updatePlayerName(NameType.NICKNAME))
                                             )
                                             .executes(clearPlayerName(NameType.NICKNAME))
+                                    )
+                    );
+
+                    dispatcher.register(
+                            CommandManager.literal("colorset")
+                                    .requires(source -> source.hasPermissionLevel(4))
+                                    .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
+                                            .then(CommandManager.argument("color", ColorArgumentType.color())
+                                                    .executes(updateOtherPlayerColor(false))
+                                            )
+                                            .executes(updateOtherPlayerColor(true))
+                                    )
+                    );
+
+                    dispatcher.register(
+                            CommandManager.literal("nameset")
+                                    .requires(source -> source.hasPermissionLevel(4))
+                                    .then(CommandManager.literal("prefix")
+                                            .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
+                                                    .then(CommandManager.argument("name", StringArgumentType.string())
+                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                    .executes(updateOtherPlayerName(NameType.PREFIX, true))
+                                                            )
+                                                            .executes(updateOtherPlayerName(NameType.PREFIX, false))
+                                                    )
+                                                    .executes(clearOtherPlayerName(NameType.PREFIX))
+                                            )
+                                    )
+                                    .then(CommandManager.literal("suffix")
+                                            .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
+                                                    .then(CommandManager.argument("name", StringArgumentType.string())
+                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                    .executes(updateOtherPlayerName(NameType.SUFFIX, true))
+                                                            )
+                                                            .executes(updateOtherPlayerName(NameType.SUFFIX, false))
+                                                    )
+                                                    .executes(clearOtherPlayerName(NameType.SUFFIX))
+                                            )
+                                    )
+                                    .then(CommandManager.literal("nickname")
+                                            .then(CommandManager.argument("player", GameProfileArgumentType.gameProfile())
+                                                    .then(CommandManager.argument("name", StringArgumentType.string())
+                                                            .then(CommandManager.argument("bold", BoolArgumentType.bool())
+                                                                    .executes(updateOtherPlayerName(NameType.NICKNAME, true))
+                                                            )
+                                                            .executes(updateOtherPlayerName(NameType.NICKNAME, false))
+                                                    )
+                                                    .executes(clearOtherPlayerName(NameType.NICKNAME))
+                                            )
                                     )
                     );
 
@@ -163,6 +219,114 @@ public class CustomName implements ModInitializer {
                 }));
     }
 
+    private Command<ServerCommandSource> updateOtherPlayerColor(boolean empty) {
+        return context -> {
+            Collection<GameProfile> profiles;
+            try {
+                profiles = GameProfileArgumentType.getProfileArgument(context, "player");
+            } catch (CommandSyntaxException exception) {
+                throw new SimpleCommandExceptionType(Text.of(exception.getMessage())).create();
+            }
+
+            if (profiles.isEmpty()) {
+                throw new SimpleCommandExceptionType(Text.of("Player(s) not found")).create();
+            }
+
+            Formatting color;
+            try {
+                if (empty) {
+                    color = null;
+                } else {
+                    color = ColorArgumentType.getColor(context, "color");
+                }
+            } catch (IllegalArgumentException exception) {
+                throw new SimpleCommandExceptionType(Text.of(exception.getMessage())).create();
+            }
+
+            for (GameProfile profile : profiles) {
+                PlayerEntity player = context.getSource().getWorld().getPlayerByUuid(profile.getId());
+                PlayerNameManager nameManager = PlayerNameManager.getPlayerNameManager(context.getSource().getServer());
+
+                nameManager.updateUuidNameFormatting(profile.getId(), color);
+
+                if (empty) {
+                    context.getSource().sendFeedback(
+                            () -> Text.literal( "Color cleared.")
+                                    .formatted(Formatting.GOLD), true);
+                } else {
+                    context.getSource().sendFeedback(
+                            () -> Text.literal( "Color set to ")
+                                    .formatted(Formatting.GOLD)
+                                    .append(String.valueOf(color)), true);
+                }
+
+
+                if (player instanceof ServerPlayerEntity) {
+                    updateListName((ServerPlayerEntity) player);
+                }
+            }
+
+            return 0;
+        };
+    }
+
+    private Command<ServerCommandSource> updateOtherPlayerName(PlayerNameManager.NameType nameType, boolean withBold) {
+        return context -> {
+            Collection<GameProfile> profiles;
+            try {
+                profiles = GameProfileArgumentType.getProfileArgument(context, "player");
+            } catch (CommandSyntaxException exception) {
+                throw new SimpleCommandExceptionType(Text.of(exception.getMessage())).create();
+            }
+
+            if (profiles.isEmpty()) {
+                throw new SimpleCommandExceptionType(Text.of("Player(s) not found")).create();
+            }
+
+            Text name;
+            try {
+                name = playerNameArgumentToText(StringArgumentType.getString(context, "name"));
+
+                if (withBold) {
+                    boolean bold = BoolArgumentType.getBool(context, "bold");
+
+                    if (bold) {
+                        name = name.copy().formatted(Formatting.BOLD);
+                    }
+                }
+            } catch (IllegalArgumentException exception) {
+                throw new SimpleCommandExceptionType(Text.of(exception.getMessage())).create();
+            }
+
+            if (invalidNameArgument(name)) {
+                throw new SimpleCommandExceptionType(Text.of("That name is invalid")).create();
+            }
+
+            for (GameProfile profile : profiles) {
+                PlayerEntity player = context.getSource().getWorld().getPlayerByUuid(profile.getId());
+                PlayerNameManager nameManager = PlayerNameManager.getPlayerNameManager(context.getSource().getServer());
+
+                if (player instanceof ServerPlayerEntity) {
+                    nameManager.updatePlayerName((ServerPlayerEntity) player, name, nameType);
+                } else {
+                    nameManager.updateUuidName(profile.getId(), Text.of(profile.getName()), name, nameType);
+                }
+
+                final Text finalName = name;
+                context.getSource().sendFeedback(
+                        () -> Text.literal(nameType.getDisplayName() + " set to ")
+                                .formatted(Formatting.GOLD)
+                                .append(finalName), true);
+
+                if (player instanceof ServerPlayerEntity) {
+                    updateListName((ServerPlayerEntity) player);
+                }
+            }
+
+            return 0;
+        };
+    }
+
     private Command<ServerCommandSource> updatePlayerName(PlayerNameManager.NameType nameType) {
         return context -> {
             ServerPlayerEntity player = context.getSource()
@@ -187,6 +351,42 @@ public class CustomName implements ModInitializer {
                             .formatted(Formatting.GOLD)
                             .append(name), true);
             updateListName(player);
+            return 0;
+        };
+    }
+
+    private Command<ServerCommandSource> clearOtherPlayerName(PlayerNameManager.NameType nameType) {
+        return context -> {
+            Collection<GameProfile> profiles;
+            try {
+                profiles = GameProfileArgumentType.getProfileArgument(context, "player");
+            } catch (CommandSyntaxException exception) {
+                throw new SimpleCommandExceptionType(Text.of(exception.getMessage())).create();
+            }
+
+            if (profiles.isEmpty()) {
+                throw new SimpleCommandExceptionType(Text.of("Player(s) not found")).create();
+            }
+
+            for (GameProfile profile : profiles) {
+                PlayerEntity player = context.getSource().getWorld().getPlayerByUuid(profile.getId());
+                PlayerNameManager nameManager = PlayerNameManager.getPlayerNameManager(context.getSource().getServer());
+
+                if (player instanceof ServerPlayerEntity) {
+                    nameManager.updatePlayerName((ServerPlayerEntity) player, null, nameType);
+                } else {
+                    nameManager.updateUuidName(profile.getId(), Text.of(profile.getName()), null, nameType);
+                }
+
+                context.getSource().sendFeedback(
+                        () -> Text.literal(nameType.getDisplayName() + " cleared")
+                                .formatted(Formatting.GOLD), true);
+
+                if (player instanceof ServerPlayerEntity) {
+                    updateListName((ServerPlayerEntity) player);
+                }
+            }
+
             return 0;
         };
     }
