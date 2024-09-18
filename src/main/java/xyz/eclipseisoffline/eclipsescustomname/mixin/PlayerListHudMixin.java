@@ -23,8 +23,8 @@ public abstract class PlayerListHudMixin {
             .thenComparing((entry) -> {
                 String lowerCaseName = Objects.requireNonNull(entry.getDisplayName()).getString().toLowerCase();
                 if (lowerCaseName.contains("[owner]")) return -6;
-                else if (lowerCaseName.contains("[admin]]")) return -5;
-                else if (lowerCaseName.contains("[dev]]")) return -4;
+                else if (lowerCaseName.contains("[admin]")) return -5;
+                else if (lowerCaseName.contains("[dev]")) return -4;
                 else if (lowerCaseName.contains("[mod]")) return -3;
                 else if (lowerCaseName.contains("[artist]")) return -2;
                 else if (lowerCaseName.contains("[content]")) return -1;
