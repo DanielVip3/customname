@@ -27,7 +27,7 @@ public abstract class PlayerListHudMixin {
                 else if (lowerCaseName.contains("[dev]")) return -4;
                 else if (lowerCaseName.contains("[mod]")) return -3;
                 else if (lowerCaseName.contains("[artist]")) return -2;
-                else if (lowerCaseName.contains("[content]")) return -1;
+                else if (lowerCaseName.contains("[creator]")) return -1;
                 else if (lowerCaseName.contains("[\uD83D\uDC20]")) return 0;
                 else if (lowerCaseName.contains("[\uD83D\uDC1F]")) return 1;
                 else if (lowerCaseName.contains("[\uD83E\uDD88]")) return 2;
